@@ -2115,7 +2115,7 @@ def submitExcelFile():
 
 # Run Server
 if __name__ =='__main__':
-    app.run(debug=True)
+    app.run()
 
     db.session.query(Quize).delete()
     db.session.commit()    
