@@ -11,3 +11,5 @@ urllib3==1.26.7
 markupsafe==2.0.1
 cryptography==3.4.8
 openpyxl
+gunicorn==22.0.0
+Werkzeug==3.0.3
