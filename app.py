@@ -72,10 +72,14 @@ class Quize(db.Model):
     explanation = db.Column(db.String(500))
     level = db.Column(db.String(200))
     adminID=db.Column(db.String(200))
+    Chapter=db.Column(db.String(200))
+    PYQ_Year=db.Column(db.String(200))
+    Resource_Link=db.Column(db.String(200))
+    
 
     db.create_all()
 
-    def __init__(self,type,pair1,pair2,img_link,que,opt1,opt2,opt3,opt4,correct_ans,subcategory,category_id,explanation,level,adminID):
+    def __init__(self,type,pair1,pair2,img_link,que,opt1,opt2,opt3,opt4,correct_ans,subcategory,category_id,explanation,level,adminID,Chapter,PYQ_Year,Resource_Link):
         self.type=type
         self.pair1=pair1
         self.pair2=pair2
@@ -91,11 +95,15 @@ class Quize(db.Model):
         self.explanation=explanation
         self.level=level
         self.adminID=adminID
+        self.Chapter=Chapter
+        self.PYQ_Year=PYQ_Year
+        self.Resource_Link=Resource_Link
+
 
 #Quize schema
 class QuizeSchema(ma.Schema):
     class Meta:
-        fields = ('id','type','pair1','pair2','img_link','que','opt1','opt2','opt3','opt4','correct_ans','subcategory','category_id','explanation','level','adminID')
+        fields = ('id','type','pair1','pair2','img_link','que','opt1','opt2','opt3','opt4','correct_ans','subcategory','category_id','explanation','level','adminID','Chapter','PYQ_Year','Resource_Link')
 
 #Init Schema
 Quize_schema = QuizeSchema()
@@ -105,6 +113,7 @@ Quizes_schema = QuizeSchema(many=True)
 class Subcategory(db.Model):
     id=db.Column(db.Integer,primary_key=True)
     topic_name=db.Column(db.String(200))
+   
     category_id=db.Column(ForeignKey('category.id'))
 
     admin_id=db.Column(db.String(200))
@@ -112,6 +121,7 @@ class Subcategory(db.Model):
 def __init__(self,topic_name,category_id,admin_id):
 
     self.topic_name=topic_name
+   
     self.category_id=category_id
     self.admin_id=admin_id
 
@@ -128,6 +138,7 @@ class Category(db.Model):
     id=db.Column(db.Integer,primary_key=True)
     Category_name=db.Column(db.String(200),unique=True)
     admin_id=db.Column(db.String(200))
+    BU=db.Column(db.String(200))
     category_Statuses = db.relationship('CategoryStatus',backref='category',lazy=True)
 
     def add_admin_ids(self,admin_id):
@@ -137,15 +148,16 @@ class Category(db.Model):
             self.admin_id += f",{admin_id}"
 
 
-    def __init__(self, Category_name,admin_id):
+    def __init__(self, Category_name,admin_id,BU):
         self.Category_name = Category_name
         self.admin_id= str(admin_id)
+        self.BU= str(BU)
 
 
 #category Schema
 class CategorySchema(ma.Schema):
     class Meta:
-        fields = ('id', 'Category_name','admin_id')
+        fields = ('id', 'Category_name','admin_id','BU')
 
 #init schema
 category_schema = CategorySchema()
@@ -550,6 +562,26 @@ def get_category_by_admin_id(admin_id):
     else:
         return jsonify([]), 404
 
+
+# get category names for user list by BU name 
+
+@app.route('/get_category_by_BU/<BU>', methods=['GET'])
+@cross_origin()
+def get_category_by_BU(BU):
+    # Query categories filtered by BU
+    categories = Category.query.filter_by(BU=BU).all()
+
+    if categories:
+        # Create a list of category details
+        category_names = [{"id": category.id, "category_name": category.Category_name} for category in categories]
+        return jsonify(category_names)
+    else:
+        # Return 404 if no categories found
+        return jsonify([]), 404
+
+
+
+
 # Add category name and status in category table
 @app.route('/category', methods=['POST'])
 @cross_origin()
@@ -748,490 +780,7 @@ def img_link_validation_MCQ_MPF (ques_json):
 
 
 
-
-# excel upload  
-
-# Excel upload route
-# @app.route('/UploadExcel', methods=["POST"])
-# @cross_origin()
-# def submitExcelFile():
-#     subcategories = {}   # Use a set to store unique subcategories from the Excel file
-#     duplicate_data = []
-#     quizzes = []
-
-#     data = request.files['file']
-#     adminID = json.loads(request.form['json'])
-#     adminID = str(adminID)
-#     print(adminID)
-
-#     data.save(data.filename)
-#     df_excel = pd.ExcelFile(data.filename)
-#     wb_obj = openpyxl.load_workbook(data.filename)
-#     redFill=PatternFill(start_color='FFFF0000',end_color='FFFF0000',fill_type='solid')
     
-#     list_of_dfs = []
-#     validation_success = True
-    
-#     try:
-#         for sheet in df_excel.sheet_names:
-#             print(sheet)
-#             if sheet == 'Sheet2':
-#                 continue
-            
-#             # Check if the category already exists
-#             existing_category = Category.query.filter(Category.Category_name == sheet).first()
-#             if not existing_category:
-#                 new_category = Category(Category_name=sheet, admin_id=adminID)
-#                 db.session.add(new_category)
-#                 db.session.commit()
-#                 db.create_all()
-#                 catID = new_category.id
-#                 print(catID)
-#             else:
-#                 existing_admin_ids = existing_category.admin_id.split(',')
-#                 if adminID not in existing_admin_ids:
-#                     existing_admin_ids.append(adminID)
-#                     existing_category.admin_id = ",".join(existing_admin_ids)
-#                     db.session.commit()
-#                 catID = existing_category.id
-
-#             category_sheet = wb_obj[sheet]
-#             max_row = 0
-#             question_set_for_category = []
-
-#             # For loop to build valid dataframe and highlight the invalid data
-#             category_sheet.cell(row=1, column=14).value = "Comment"
-#             i = 2
-
-#             while max_row == 0:
-#                 ques_json = {
-#                     "type": category_sheet.cell(row=i, column=1).value,
-#                     "pair1": category_sheet.cell(row=i, column=2).value,
-#                     "pair2": category_sheet.cell(row=i, column=3).value,
-#                     "img_link": category_sheet.cell(row=i, column=4).value,
-#                     "que": category_sheet.cell(row=i, column=5).value,
-#                     "opt1": category_sheet.cell(row=i, column=6).value,
-#                     "opt2": category_sheet.cell(row=i, column=7).value,
-#                     "opt3": category_sheet.cell(row=i, column=8).value,
-#                     "opt4": category_sheet.cell(row=i, column=9).value,
-#                     "correct_ans": category_sheet.cell(row=i, column=10).value,
-#                     "explanation": category_sheet.cell(row=i, column=11).value,
-#                     "level": category_sheet.cell(row=i, column=12).value,
-#                     "subcategory": category_sheet.cell(row=i, column=13).value,
-#                 }
-#                 if all(val is None for val in ques_json.values()):
-#                     break
-#                 else:
-#                     comment = ""
-#                     type_validation_status, type_validation_comment = type_validation(ques_json)
-#                     if not type_validation_status:
-#                         comment += type_validation_comment
-
-#                     pair_validation_status, pair_validation_comment = pair_validation(ques_json)
-#                     if not pair_validation_status:
-#                         comment += pair_validation_comment
-
-#                     options_validation_status, options_validation_comment = options_validation(ques_json)
-#                     if not options_validation_status:
-#                         comment += options_validation_comment
-
-#                     explanation_validation_status, explanation_validation_comment = explanation_validation(ques_json)
-#                     if not explanation_validation_status:
-#                         comment += explanation_validation_comment
-                    
-#                     correct_ans_validation_status, correct_ans_validation_comment = correct_ans_validation(ques_json)
-#                     if (not correct_ans_validation_status):
-#                         comment = comment+";"+ correct_ans_validation_comment 
-
-#                     level_validation_status, level_validation_comment = level_validation(ques_json)
-#                     if (not level_validation_status):
-#                         comment = comment+";"+ level_validation_comment  
-
-
-#                     IMG_validation_status, IMG_validation_comment = IMG_validation(ques_json)
-#                     if (not IMG_validation_status):
-#                         comment = comment+";"+ IMG_validation_comment
-
-
-#                     img_link_validation_MCQ_MPF_status, img_link_validation_MCQ_MPF_comment = img_link_validation_MCQ_MPF(ques_json)
-#                     if (not img_link_validation_MCQ_MPF_status):
-#                         comment = comment+";"+ img_link_validation_MCQ_MPF_comment  
-
-#                     pair_validation_MCQ_IMG_status, pair_validation_MCQ_IMG_comment = pair_validation_MCQ_IMG(
-#                         ques_json)
-#                     if (not pair_validation_MCQ_IMG_status):
-#                         comment = comment+";"+ pair_validation_MCQ_IMG_comment  
-
-                    
-#                     if (comment == ""):
-#                         comment = "Valid Question"
-#                         question_set_for_category.append(ques_json)
-#                         category_sheet.cell(row = i, column = 14).value = "Valid Question"
-#                     else:
-#                         validation_success = False
-
-#                         category_sheet.cell(row = i, column = 13).value = comment[1:]
-
-#                         for k in range(1,14):
-#                             category_sheet.cell(row=i, column=k).fill = redFill
-#                     i+=1
-        
-#             df1=pd.DataFrame.from_dict(question_set_for_category)
-#             df1['category_id']=catID
-
-#             list_of_dfs.append(df1)
-
-#             for index,row in df1.iterrows():
-#                 subcategory = row['subcategory']
-
-#                 if subcategory not in subcategories:
-#                     subcategories[subcategory] = {'category_ids': []}
-#                 subcategories[subcategory]['category_ids'].append(catID)
-
-#         for subcategory, info in subcategories.items():
-#             for category_id in info['category_ids']:
-#                 existing_subcategory= Subcategory.query.filter_by(topic_name=subcategory,category_id=category_id,admin_id=adminID).first()
-#                 if not existing_subcategory:
-#                     new_subcategory = Subcategory(
-#                         topic_name=subcategory,
-#                         category_id=category_id,
-#                         admin_id=adminID
-#                     )
-#                     db.session.add(new_subcategory)
-#         db.session.commit()
-
-#         df= pd.concat(list_of_dfs,ignore_index=True)
-#         print(df)
-
-#         wb_obj.save("Validation Results.xlsx")
-
-#         matched_df = df
-#         def convrt_to_html(pair1,pair2):
-#             table_html = "Match the following<br><table style='border:1px solid black;'>" 
-#             table_html += "<tr><th style='border:1px solid black;'>Column A</th><th style='border:1px solid black;'>Column B</th></tr>" 
-#             pair1_values = pair1.split('\n')
-#             pair2_values = pair2.split('\n')
-
-#             i=0
-
-#             for p1,p2 in zip(pair1_values,pair2_values):
-#                 table_html += "<tr><td style='border:1px solid black;'>" +alpha[i]+" {}</td><td style='border:1px solid black;'>".format(p1) +roman[i]+" {}</td></tr>".format(p2)
-#                 i+=1
-#             table_html += "</table>"
-#             return table_html
-#         matched_df['que']=df.apply(lambda row: convrt_to_html(row['pair1'],row['pair2'])if row['type']=='MPF'else row['que'],axis=1)
-
-#         def convert_html_img_tag(img_link,que):
-#             html_img_tag ='<img src="' + img_link + '"><br><p>'+ que +'</p>'
-#             return Markup(html_img_tag)
-#         matched_df['que']=df.apply(lambda row: convert_html_img_tag(row['img_link'],row['que'])if row['type']=='IMG'else row['que'],axis=1)
-
-
-#         df_json = json.loads(matched_df.to_json(orient="records"))
-
-
-#         for json_data in df_json:
-#             type_str=str(json_data['type']).strip()
-#             pair1_str=str(json_data['pair1']).strip() if isinstance(json_data['pair1'],str) else None
-#             pair2_str=str(json_data['pair2']).strip() if isinstance(json_data['pair2'],str) else None
-#             img_link_str=str(json_data['img_link']).strip()
-#             que_str=str(json_data['que']).strip()
-#             opt1_str=str(json_data['opt1']).strip()
-#             opt2_str=str(json_data['opt2']).strip()
-#             opt3_str=str(json_data['opt3']).strip()
-#             opt4_str=str(json_data['opt4']).strip()
-#             correct_ans_str=str(json_data['correct_ans']).strip()
-#             subcategory_str=str(json_data['subcategory']).strip()
-#             explanation_str=str(json_data['explanation']).strip()
-#             category_id_str=str(json_data['category_id']).strip()
-#             level_str=str(json_data['level']).strip()
-
-#             existing_quiz=Quize.query.filter_by(que=que_str,category_id=category_id_str,subcategory=subcategory_str).first()
-
-#             if not existing_quiz:
-#                 new_quize=Quize(
-#                     type=type_str,
-#                     pair1=pair1_str,
-#                     pair2=pair2_str,
-#                     img_link=img_link_str,
-#                     que=que_str,
-#                     opt1=opt1_str,
-#                     opt2=opt2_str,
-#                     opt3=opt3_str,
-#                     opt4=opt4_str,
-#                     correct_ans=correct_ans_str,
-#                     explanation=explanation_str,
-#                     level=level_str,
-#                     subcategory=subcategory_str,
-#                     category_id=category_id_str,
-#                     adminID=adminID
-#                 )
-#                 db.session.add(new_quize)
-
-#             else:
-
-#                 existing_admin_ids=existing_quiz.adminID.split(',')
-#                 if adminID not in existing_admin_ids:
-#                     existing_admin_ids.append(adminID)
-#                     existing_quiz.adminID=','.join(existing_admin_ids)
-#             db.session.commit()
-#     except IntegrityError as e:
-#         db.session.rollback()
-#         validation_success=False
-    
-#     if validation_success:
-#         msg={'msg':'success'}
-#         return jsonify(msg)
-#     else:
-       
-#        msg= {"msg": "Failed",  "error": "Validation failed for some questions"}
-  
-#        return jsonify(msg)
-
-
-
-                    
-
-    
-
-
-
-
-
-
-# excel upload data into db
-# @app.route('/UploadExcel', methods=["POST"])
-# @cross_origin()
-# def submitExcelFile():
-#     duplicate_data=[]
-#     quezes = []
-#     data = request.files['file']
-#     data.save(data.filename)
-#     df_excel = pd.ExcelFile(data.filename)
-#     wb_obj = openpyxl.load_workbook(data.filename)
-#     redFill = PatternFill(start_color='FFFF0000',
-#                           end_color='FFFF0000',
-#                           fill_type='solid')
-    
-#     # df=pd.read_excel(data)
-#     #convert pandas to json
-#     list_of_dfs =[]
-
-#     #Iterate trough each worksheet
-
-#     validation_success = True
-#     for sheet in df_excel.sheet_names:
-#         print(sheet)
-#         if (sheet=='sheet2'):
-#             continue
-
-#         cat = Category.query.filter(Category.Category_name == sheet).all()
-#         result = categorys_schema.dump(cat)
-#         if len(result)==0:
-#             new_category = Category(Category_name=sheet, status=True)
-#             db.session.add(new_category)
-#             db.session.commit()
-#             db.create_all()
-#             catId= new_category.id
-
-#         else:
-#             catId=result[0]["id"]
-
-
-
-#         category_sheet = wb_obj[sheet]
-#         max_row = 0
-#         question_set_for_category = []
-#         #for loop to build valid dataframe and highlight the invalid data
-#         category_sheet.cell(row = 1, column = 13).value = "comment"
-#         i=2
-#         while(max_row==0):
-#             ques_json = {
-#                 "type": category_sheet.cell(row=i, column=1).value,
-#                 "pair1": category_sheet.cell(row=i, column=2).value,
-#                 "pair2": category_sheet.cell(row=i, column=3).value,
-#                 "img_link": category_sheet.cell(row=i, column=4).value,
-#                 "que": category_sheet.cell(row=i, column=5).value,
-#                 "opt1": category_sheet.cell(row=i, column=6).value,
-#                 "opt2": category_sheet.cell(row=i, column=7).value,
-#                 "opt3": category_sheet.cell(row=i, column=8).value,
-#                 "opt4": category_sheet.cell(row=i, column=9).value,
-#                 "correct_ans": category_sheet.cell(row=i, column=10).value,
-#                 "explanation": category_sheet.cell(row=i, column=11).value,
-#                 "level": category_sheet.cell(row=i, column=12).value,
-#             }
-#             print("=====================================================")
-#             print(ques_json)
-#             if ques_json['type'] == None and ques_json['pair1']==None and ques_json['pair2']==None and ques_json['que']==None and ques_json['img_link']==None and ques_json['opt1']==None and ques_json['opt2']==None and ques_json['opt3']==None and ques_json['opt4']==None and ques_json['correct_ans']==None and ques_json['explanation']==None and ques_json['level']==None:
-#                 print("inside if statement")
-#                 break
-#             else:
-#                 print("inside else statement")
-#                 comment =""
-
-#                 type_validation_status,type_validation_comment = type_validation(ques_json)
-#                 if (not type_validation_status):
-#                     comment = comment+";"+ type_validation_comment  
-
-#                 pair_validation_status,pair_validation_comment = pair_validation(
-#                     ques_json)
-#                 if (not pair_validation_status):
-#                     comment = comment+";"+ pair_validation_comment
-
-#                 options_validation_status,options_validation_comment = options_validation(ques_json)
-#                 if (not options_validation_status):
-#                     comment = comment+";"+ options_validation_comment    
-
-#                 explanation_validation_status,explanation_validation_comment = explanation_validation(ques_json)
-#                 if (not explanation_validation_status):
-#                     comment = comment+";"+ explanation_validation_comment 
-
-#                 correct_ans_validation_status, correct_ans_validation_comment = correct_ans_validation(ques_json)
-#                 if (not correct_ans_validation_status):
-#                     comment = comment+";"+ correct_ans_validation_comment 
-
-#                 level_validation_status, level_validation_comment = level_validation(ques_json)
-#                 if (not level_validation_status):
-#                     comment = comment+";"+ level_validation_comment  
-
-
-#                 IMG_validation_status, IMG_validation_comment = IMG_validation(ques_json)
-#                 if (not IMG_validation_status):
-#                     comment = comment+";"+ IMG_validation_comment
-
-
-#                 img_link_validation_MCQ_MPF_status, img_link_validation_MCQ_MPF_comment = img_link_validation_MCQ_MPF(ques_json)
-#                 if (not img_link_validation_MCQ_MPF_status):
-#                     comment = comment+";"+ img_link_validation_MCQ_MPF_comment  
-
-#                 pair_validation_MCQ_IMG_status, pair_validation_MCQ_IMG_comment = pair_validation_MCQ_IMG(
-#                     ques_json)
-#                 if (not pair_validation_MCQ_IMG_status):
-#                     comment = comment+";"+ pair_validation_MCQ_IMG_comment  
-
-                
-#                 if (comment == ""):
-#                     comment = "Valid Question"
-#                     question_set_for_category.append(ques_json)
-#                     category_sheet.cell(row = i, column = 13).value = "Valid Question"
-#                 else:
-#                     validation_success = False
-
-#                     category_sheet.cell(row = i, column = 13).value = comment[1:]
-
-#                     for k in range(1,14):
-#                         category_sheet.cell(row=i, column=k).fill = redFill
-#             i+=1
-
-
-
-#         #df1 = df_excel.parse(sheet)
-#         print(question_set_for_category)
-#         df1 = pd.DataFrame.from_dict(question_set_for_category)
-#         df1['category_id'] = catId
-#         #And append it to the list
-#         list_of_dfs.append(df1)
-
-#     #combine all DataFrame into one
-#     df = pd.concat(list_of_dfs,ignore_index=True)
-#     wb_obj.save("Validation Results.xlsm")
-
-
-#     matched_df = df
-#     def convrt_to_html(pair1,pair2):
-#         table_html = "Match the following<br><table style='border:1px solid black;'>" 
-#         table_html += "<tr><th style='border:1px solid black;'>Column A</th><th style='border:1px solid black;'>Column B</th></tr>" 
-#         pair1_values = pair1.split('\n')
-#         pair2_values = pair2.split('\n')
-
-#         i=0
-
-#         for p1,p2 in zip(pair1_values,pair2_values):
-#             table_html += "<tr><td style='border:1px solid black;'>" +alpha[i]+" {}</td><td style='border:1px solid black;'>".format(p1) +roman[i]+" {}</td></tr>".format(p2)
-#             i+=1
-#         table_html += "</table>"
-#         return table_html
-#     matched_df['que']=df.apply(lambda row: convrt_to_html(row['pair1'],row['pair2'])if row['type']=='MPF'else row['que'],axis=1)
-
-#     def convert_html_img_tag(img_link,que):
-#         html_img_tag ='<img src="' + img_link + '"><br><p>'+ que +'</p>'
-#         return Markup(html_img_tag)
-#     matched_df['que']=df.apply(lambda row: convert_html_img_tag(row['img_link'],row['que'])if row['type']=='IMG'else row['que'],axis=1)
-
-
-#     df_json = json.loads(matched_df.to_json(orient="records"))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#     print(df_json)
-#     for jsondata in df_json:
-#         jsondata['type']=str(jsondata['type']).strip()
-#         jsondata['pair1']=str(jsondata['pair1']).strip() if isinstance(jsondata['pair1'],str) else None
-#         jsondata['pair2']=str(jsondata['pair2']).strip() if isinstance(jsondata['pair2'],str) else None
-#         jsondata['que']=str(jsondata['que']).strip()
-#         jsondata['opt1']=str(jsondata['opt1']).strip()
-#         jsondata['opt2']=str(jsondata['opt2']).strip()
-#         jsondata['opt3']=str(jsondata['opt3']).strip()
-#         jsondata['opt4']=str(jsondata['opt4']).strip()
-#         jsondata['correct_ans']=str(jsondata['correct_ans']).strip()
-
-#         jsondata['explanation']=str(jsondata['explanation']).strip()
-#         jsondata['level']=str(jsondata['level']).strip()
-
-
-
-
-
-#         new_quize = Quize(**jsondata)
-
-#         quizes.append(new_quize)
-#     print('******************************************************')
-#     print(df_json)
-
-
-
-
-#     for quiz_data in quizes:
-#         try:
-
-#             db.session.add(quiz_data)
-#             db.session.commit()
-
-#         except Exception as e:
-
-#             db.session.rollback()
-#             duplicate_data.append(quiz_data)
-#             pass
-
-
-
-
-
-
-#     # [db.session.refresh(quizedata) for quizedata in quizes]
-
-#     if validation_success:
-#         msg={'msg':'success'}
-#         return jsonify(msg)
-#     else:
-#         msg={'msg': r'C:\Users\VK56833\OneDrive - Citi\Python Assignment\code\flask'}
-#         return jsonify(msg)
-    
-
-
-
 #Get all Quizes
 @app.route('/quizes',methods=['Get'])
 @cross_origin()
@@ -1257,33 +806,6 @@ def get_allCat_quiz(category_id):
     return jsonify(result)
 
 
-
-
-
-
-
-
-
-
-
-# @app.route('/category/<int:category_id>',methods=['PUT'])
-# def update_category_status(category_id):
-#     try:
-#         status = request.json['new_status']
-
-#         category = Category.query.get(category_id)
-
-#         if category is None:
-#             return jsonify({"message": "Category not found"}), 404
-        
-#         category.update_status(status)
-#         db.session.commit()
-
-#         serialized_category = category_schema.dump(category)
-#         return jsonify({"message": "Category status updated successfully","category":serialized_category}), 200
-
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
 
 
 @app.route('/category',methods=['POST'])
@@ -1323,66 +845,64 @@ def get_ByCategory(id):
 
 
 
-
-#Create a user
 @app.route('/user', methods=['POST'])
 @cross_origin()
 def add_user():
-   
-    name = request.json['name']
-    username = request.json['username']
-    password = request.json['password']
-    email = request.json['email']
-    status = request.json['status']
-    BU = request.json['BU']
-    mode = request.json['mode']
+    try:
+        # Log incoming request
+        print("Request Data:", request.json)
 
-    # encrypted_password = hashlib.sha256(password.encode()).hexdigest()
+        name = request.json['name']
+        username = request.json['username']
+        password = request.json['password']
+        email = request.json['email']
+        status = request.json['status']
+        BU = request.json['BU']
+        mode = request.json['mode']
 
-    new_user = Login(name=name, username=username, 
-                     password=password, email=email, status=status, BU=BU, mode=mode)
-    db.session.add(new_user)
-    db.session.commit()
+        # Create and add new user
+        new_user = Login(name=name, username=username, 
+                         password=password, email=email, status=status, BU=BU, mode=mode)
+        db.session.add(new_user)
+        db.session.commit()
 
-    admin_ids = adminLogin.query.filter_by(BU=BU).with_entities(adminLogin.id).all()
-    print(admin_ids)
+        # Fetch associated admin IDs
+        admin_ids = adminLogin.query.filter_by(BU=BU).with_entities(adminLogin.id).all()
+        print("Admin IDs:", admin_ids)
 
-    if admin_ids:
+        if not admin_ids:
+            print(f"No admin IDs found for BU: {BU}")
+            return jsonify({
+                "error": "Associated admin IDs not found",
+                "details": f"No matching admin IDs for BU: {BU}"
+            }), 400
+
+        # Process admin IDs if found
         admin_ids = [admin_id for admin_id, in admin_ids]
         associated_categories = Category.query.filter(Category.admin_id.contains(',' .join(map(str, admin_ids)))).all()
-
         unique_category_ids = set(category.id for category in associated_categories)
-        print(unique_category_ids)
+        print("Unique Category IDs:", unique_category_ids)
+
+        # Additional processing
         for category_id in unique_category_ids:
             category_status = CategoryStatus(status=True, category_id=category_id, user_id=new_user.id)
             db.session.add(category_status)
 
-        recipient = new_user.email
-        cc_recipient = username
-        subject = ' Catalyst Knowledge Assessment(CKA)'
-        body = "Hi, \n\nThank you for registering in  Catalyst Knowledge Assessment. Please use your  email id and password to login into the portal. \n\nRegards, \nCatalyst Knowledge Assessment(CKA)"
-
-        # send_email(account, subject, body, recipient, cc_recipient)
         db.session.commit()
 
-        admin_record = adminLogin.query.filter_by(BU=BU).first()
-        if admin_record:
-            admin_id = admin_record.id
-            subcategories = Subcategory.query.filter_by(admin_id=admin_id).all()
+        # Return success response
+        return jsonify({
+            "message": "User registered successfully",
+            "user": login_schema.dump(new_user)
+        }), 201
 
-            for subcategory in subcategories:
-                subcategory_status = SubcategoryStatus(
-                    status=True,
-                    category_id=subcategory.category_id,
-                    topic_name=subcategory.topic_name,
-                    user_id=new_user.id,
-                    level="Low"
-                )
-                db.session.add(subcategory_status)
-            db.session.commit()
-        return login_schema.jsonify(new_user)
-
-    return jsonify({"error": "Associated adminIds not found for the given BU"}), 400
+    except Exception as e:
+        db.session.rollback()
+        print("Error:", str(e))
+        return jsonify({
+            "error": "An unexpected error occurred",
+            "details": str(e)
+        }), 500
 
 
 #Login API
@@ -1464,9 +984,9 @@ def getTopicLevels(admin_id, category_id, topic_name):
     levels = [result[0] for result in results]
     return levels, 200
 
-# # Get subcategory by admin id and category id
+# Get subcategory by admin id and category id
 # @app.route('/get_subcategory/<admin_id>/<category_id>', methods=['GET'])
-# def get_subcategories(admin_id, category_id):
+# def get_subcategoriesByAdminIdCategoryID(admin_id, category_id):
 #     subcategories = Subcategory.query.filter_by(admin_id=admin_id, category_id=category_id).all()
 
 #     if not subcategories:
@@ -1693,250 +1213,61 @@ send_email(
 )
 
 
-# @app.route("/sendmail/<login_id>")
-#  @cross_origin()
-# def mailbody(login_id):
-#    user = Login.query.get(login_id)
-#    email = user.email
-#    subject="Citi Exam"
-#    body="Hi ,\n\nThank you for giving an citi exam. \n\nThanks & Regards,\nCiti Exam"
-#    m= Message(
-#        account=account,
-#        subject=subject,
-#        body=body,
-#        to_recipients = [email]
-#    )
-#    m.send()
 
+@app.route('/unique-chapters/<int:category_id>', methods=['GET'])
+def get_unique_chapters(category_id):
+    try:
+        # Query to get distinct chapters for the given category_id
+        unique_chapters = db.session.query(Quize.Chapter).filter(Quize.category_id == category_id).distinct().all()
 
-#    return "success"
+        # Extract the chapters from the result
+        chapters = [chapter[0] for chapter in unique_chapters]
+
+        return jsonify({'category_id': category_id, 'unique_chapters': chapters}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 
+@app.route('/quiz/<int:category_id>/<string:chapter>/<string:subcategory>/<string:level>', methods=['GET'])
+def get_quiz(category_id, chapter, subcategory, level):
+    try:
+        # Query to filter quizzes based on the provided parameters
+        quizzes = Quize.query.filter_by(
+            category_id=category_id,
+            Chapter=chapter,
+            subcategory=subcategory,
+            level=level
+        ).all()
 
+        # Convert the query result to a list of dictionaries
+        quiz_list = [
+            {
+                'id': quiz.id,
+                'type': quiz.type,
+                'pair1': quiz.pair1,
+                'pair2': quiz.pair2,
+                'img_link': quiz.img_link,
+                'que': quiz.que,
+                'opt1': quiz.opt1,
+                'opt2': quiz.opt2,
+                'opt3': quiz.opt3,
+                'opt4': quiz.opt4,
+                'correct_ans': quiz.correct_ans,
+                'subcategory': quiz.subcategory,
+                'category_id': quiz.category_id,
+                'explanation': quiz.explanation,
+                'level': quiz.level,
+                'adminID': quiz.adminID,
+                'Chapter': quiz.Chapter,
+                'PYQ_Year': quiz.PYQ_Year,
+                'Resource_Link': quiz.Resource_Link
+            } for quiz in quizzes
+        ]
 
-
-
-
-
-
-
-
-# @app.route("/UploadExcel", methods=["POST"])
-# @cross_origin()
-# def submitExcelFile():
-#     # Use a set to store unique subcategories from the Excel file
-#     subcategories = {}
-#     subcategory_levels = {}
-#     duplicate_data = []
-#     quizzes = []
-
-#     data = request.files['file']
-#     adminID = json.loads(request.form['json'])
-#     adminID = str(adminID)
-#     print(adminID)
-
-#     data.save(data.filename)
-
-#     df_excel = pd.ExcelFile(data.filename)
-#     wb_obj = openpyxl.load_workbook(data.filename)
-
-#     redFill = PatternFill(start_color="FFFF0000",
-#                           end_color="FFFF0000",
-#                           fill_type="solid")
-
-#     list_of_dfs = []
-#     validation_success = True
-
-#     try:
-#         for sheet in df_excel.sheet_names:
-#             if sheet == "Sheet2":
-#                 continue
-
-#             # Check if the category already exists
-#             existing_category = Category.query.filter(
-#                 Category.Category_name == sheet).first()
-
-#             if not existing_category:
-#                 new_category = Category(Category_name=sheet, admin_id=adminID)
-#                 db.session.add(new_category)
-#                 db.session.commit()
-#                 db.create_all()
-#                 catId = new_category.id
-#                 print(catId)
-#             else:
-#                 existing_admin_ids = existing_category.admin_id.split(',')
-#                 if adminID not in existing_admin_ids:
-#                     existing_admin_ids.append(adminID)
-#                     existing_category.admin_id = ','.join(existing_admin_ids)
-#                     db.session.commit()
-#                 catId = existing_category.id
-
-#             category_sheet = wb_obj[sheet]
-#             max_row = 0
-#             question_set_for_category = []
-#             category_sheet.cell(row=1, column=14).value = "Comment"
-#             i = 2
-
-#             while max_row == 0:
-#                 ques_json = {
-#                     "type": category_sheet.cell(row=i, column=1).value,
-#                     "pair1": category_sheet.cell(row=i, column=2).value,
-#                     "pair2": category_sheet.cell(row=i, column=3).value,
-#                     "img_link": category_sheet.cell(row=i, column=4).value,
-#                     "que": category_sheet.cell(row=i, column=5).value,
-#                     "opt1": category_sheet.cell(row=i, column=6).value,
-#                     "opt2": category_sheet.cell(row=i, column=7).value,
-#                     "opt3": category_sheet.cell(row=i, column=8).value,
-#                     "opt4": category_sheet.cell(row=i, column=9).value,
-#                     "correct_ans": category_sheet.cell(row=i, column=10).value,
-#                     "explanation": category_sheet.cell(row=i, column=11).value,
-#                     "level": category_sheet.cell(row=i, column=12).value,
-#                     "subcategory": category_sheet.cell(row=i, column=13).value,
-#                 }
-
-#                 if all(val is None for val in ques_json.values()):
-#                     break
-#                 else:
-#                     comment = ""
-
-#                     type_validation_status, type_validation_comment = type_validation(ques_json)
-#                     if not type_validation_status:
-#                         comment += ";" + type_validation_comment
-
-#                     pair_validation_status, pair_validation_comment = pair_validation(ques_json)
-#                     if not pair_validation_status:
-#                         comment += ";" + pair_validation_comment
-
-#                     options_validation_status, options_validation_comment = options_validation(ques_json)
-#                     if not options_validation_status:
-#                         comment += ";" + options_validation_comment
-
-#                     explanation_validation_status, explanation_validation_comment = explanation_validation(ques_json)
-#                     if not explanation_validation_status:
-#                         comment += ";" + explanation_validation_comment
-
-#                     subcategory_name_validation_status, subcategory_validation_comment = subcategory_validation(ques_json)
-#                     if not subcategory_name_validation_status:
-#                         comment += ";" + subcategory_validation_comment
-
-#                     correct_ans_validation_status, correct_ans_validation_comment = correct_ans_validation(ques_json)
-#                     if not correct_ans_validation_status:
-#                         comment += ";" + correct_ans_validation_comment
-
-#                     level_validation_status, level_validation_comment = level_validation(ques_json)
-#                     if not level_validation_status:
-#                         comment += ";" + level_validation_comment
-
-#                     IMG_validation_status, IMG_validation_comment = IMG_validation(ques_json)
-#                     if not IMG_validation_status:
-#                         comment += ";" + IMG_validation_comment
-
-#                     img_link_validation_MCQ_MPF_status, img_link_validation_MCQ_MPF_comment = img_link_validation_MCQ_MPF(ques_json)
-#                     if not img_link_validation_MCQ_MPF_status:
-#                         comment += ";" + img_link_validation_MCQ_MPF_comment
-
-#                     pair_validation_MCQ_IMG_status, pair_validation_MCQ_IMG_comment = pair_validation_MCQ_IMG(ques_json)
-#                     if not pair_validation_MCQ_IMG_status:
-#                         comment += ";" + pair_validation_MCQ_IMG_comment
-
-#                     if comment == "":
-#                         comment = "Valid Question"
-#                         question_set_for_category.append(ques_json)
-#                         category_sheet.cell(row=i, column=14).value = "Valid Question"
-#                     else:
-#                         validation_success = False
-#                         category_sheet.cell(row=i, column=14).value = comment[1:]
-#                         for k in range(1, 14):
-#                             category_sheet.cell(row=i, column=k).fill = redFill
-#                     i += 1
-
-#             df1 = pd.DataFrame.from_dict(question_set_for_category)
-#             df1['category_id'] = catId
-#             list_of_dfs.append(df1)
-
-#         for index, row in df1.iterrows():
-#             subcategory = row['subcategory']
-#             if subcategory not in subcategories:
-#                 subcategories[subcategory] = {'category_ids': [catId]}
-
-#         for subcategory, info in subcategories.items():
-#             for category_id in info['category_ids']:
-#                 existing_subcategory = Subcategory.query.filter_by(
-#                     topic_name=subcategory, category_id=category_id, admin_id=adminID).first()
-#                 if not existing_subcategory:
-#                     new_subcategory = Subcategory(
-#                         topic_name=subcategory,
-#                         category_id=category_id,
-#                         admin_id=adminID
-#                     )
-#                     db.session.add(new_subcategory)
-#                     print("subcategory added")
-#         db.session.commit()
-
-#         df = pd.concat(list_of_dfs, ignore_index=True)
-#         wb_obj.save("Validation Results.xlsx")
-
-#         matched_df = df
-
-#         df_json = json.loads(matched_df.to_json(orient="records"))
-#         print(df_json)
-
-#         for json_data in df_json:
-#             type_str = str(json_data['type']).strip()
-#             pair1_str = str(json_data['pair1']).strip() if isinstance(json_data['pair1'], str) else None
-#             pair2_str = str(json_data['pair2']).strip() if isinstance(json_data['pair2'], str) else None
-#             img_link_str = str(json_data['img_link']).strip()
-#             que_str = str(json_data['que']).strip()
-#             opt1_str = str(json_data['opt1']).strip()
-#             opt2_str = str(json_data['opt2']).strip()
-#             opt3_str = str(json_data['opt3']).strip()
-#             opt4_str = str(json_data['opt4']).strip()
-#             correct_ans_str = str(json_data['correct_ans']).strip()
-#             subcategory_str = str(json_data['subcategory']).strip()
-#             explanation_str = str(json_data['explanation']).strip()
-#             category_id_str = str(json_data['category_id']).strip()
-#             level_str = str(json_data['level']).strip()
-
-#             existing_quiz = Quize.query.filter_by(
-#                 que=que_str, category_id=category_id_str, subcategory=subcategory_str).first()
-
-#             if not existing_quiz:
-#                 new_quiz = Quize(
-#                     type=type_str,
-#                     pair1=pair1_str,
-#                     pair2=pair2_str,
-#                     img_link=img_link_str,
-#                     que=que_str,
-#                     opt1=opt1_str,
-#                     opt2=opt2_str,
-#                     opt3=opt3_str,
-#                     opt4=opt4_str,
-#                     correct_ans=correct_ans_str,
-#                     subcategory=subcategory_str,
-#                     explanation=explanation_str,
-#                     level=level_str,
-#                     category_id=category_id_str,
-#                     adminID=adminID
-#                 )
-#                 db.session.add(new_quiz)
-#             else:
-#                 existing_admin_ids = existing_quiz.adminID.split(',')
-#                 if adminID not in existing_admin_ids:
-#                     existing_admin_ids.append(adminID)
-#                     existing_quiz.adminID = ','.join(existing_admin_ids)
-
-#         db.session.commit()
-#     except IntegrityError as e:
-#         db.session.rollback()
-#         validation_success = False
-
-#     if validation_success:
-#         msg = {'msg': 'success'}
-#     else:
-#         msg = {'msg': 'failed'}
-
-#     return jsonify(msg)
+        return jsonify({'quizzes': quiz_list}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 
@@ -1952,8 +1283,8 @@ def submitExcelFile():
 
     # Retrieve uploaded file and admin ID
     data = request.files['file']
-    adminID = json.loads(request.form['json'])
-    adminID = str(adminID)
+    adminID = request.form.get('adminID')
+    BU = request.form.get('BU')
 
     # Save and load the Excel file
     data.save(data.filename)
@@ -1970,9 +1301,9 @@ def submitExcelFile():
                 continue
 
             # Check or create the category
-            existing_category = Category.query.filter(Category.Category_name == sheet).first()
+            existing_category = Category.query.filter(Category.Category_name == sheet,Category.BU == BU ).first()
             if not existing_category:
-                new_category = Category(Category_name=sheet, admin_id=adminID)
+                new_category = Category(Category_name=sheet, admin_id=adminID,BU=BU)
                 db.session.add(new_category)
                 db.session.commit()
                 catId = new_category.id
@@ -1982,7 +1313,11 @@ def submitExcelFile():
                 if adminID not in existing_admin_ids:
                     existing_admin_ids.append(adminID)
                     existing_category.admin_id = ','.join(existing_admin_ids)
-                    db.session.commit()
+
+                if existing_category.BU != BU:
+                    existing_category.BU = BU
+
+                db.session.commit()
                 catId = existing_category.id
 
             # Load the category sheet
@@ -2007,6 +1342,9 @@ def submitExcelFile():
                     "explanation": category_sheet.cell(row=i, column=11).value,
                     "level": category_sheet.cell(row=i, column=12).value,
                     "subcategory": category_sheet.cell(row=i, column=13).value,
+                    "Chapter": category_sheet.cell(row=i, column=14).value,
+                    "PYQ_Year": category_sheet.cell(row=i, column=15).value,
+                    "Resource_Link": category_sheet.cell(row=i, column=16).value,
                 }
 
                 # Stop if the row is empty
@@ -2071,6 +1409,36 @@ def submitExcelFile():
         wb_obj.save("Validation Results.xlsx")
         matched_df = pd.concat(list_of_dfs, ignore_index=True)
 
+        def convrt_to_html(pair1, pair2):
+            table_html = "Match the following<br><table style='border:1px solid black;'>"
+            table_html += "<tr><th style='border:1px solid black;'>Column A</th><th style='border:1px solid black;'>Column B</th></tr>"
+            pair1_values = pair1.split('\n')
+            pair2_values = pair2.split('\n')
+
+            alpha = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+            roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
+
+            i = 0
+
+            for p1, p2 in zip(pair1_values, pair2_values):
+                table_html += f"<tr><td style='border:1px solid black;'>{alpha[i]} {p1}</td><td style='border:1px solid black;'>{roman[i]} {p2}</td></tr>"
+                i += 1
+            table_html += "</table>"
+            return table_html
+
+        matched_df['que'] = matched_df.apply(
+            lambda row: convrt_to_html(row['pair1'], row['pair2']) if row['type'] == 'MPF' else row['que'],
+            axis=1
+        )
+
+        def convert_html_img_tag(img_link, que):
+            return Markup(f'<div style="width: 100%; text-align: center;"><img src="{img_link}" style="width: 100%; height: auto;"><br><p>{que}</p></div>') if img_link else que
+
+        matched_df['que'] = matched_df.apply(
+            lambda row: convert_html_img_tag(row['img_link'], row['que']) if row['type'] == 'IMG' else row['que'],
+            axis=1
+        )
+
         # Add questions to the quiz table
         for _, json_data in matched_df.iterrows():
             existing_quiz = Quize.query.filter_by(
@@ -2092,6 +1460,9 @@ def submitExcelFile():
                     subcategory=json_data['subcategory'],
                     explanation=json_data['explanation'],
                     level=json_data['level'],
+                    Chapter=json_data['Chapter'],
+                    PYQ_Year=json_data['PYQ_Year'],
+                    Resource_Link=json_data['Resource_Link'],
                     category_id=json_data['category_id'],
                     adminID=adminID
                 )
@@ -2106,12 +1477,6 @@ def submitExcelFile():
     # Return response
     msg = {'msg': 'success' if validation_success else 'failed'}
     return jsonify(msg)
-
-
-
-
-
-
 
 # Run Server
 if __name__ =='__main__':
